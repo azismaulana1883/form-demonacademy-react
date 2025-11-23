@@ -1,5 +1,5 @@
 import { useState } from "react";
-import FaceVerification from "./pages/FaceVerification";
+import FaceVerification from "./components/FaceVerificationMPNew.jsx";
 import RegForm from "./pages/RegForm";
 
 export default function App() {
