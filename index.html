@@ -6,50 +6,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Form Member Demon Academy</title>
   </head>
-
   <body>
     <div id="root"></div>
-
-    <!-- Script utama React -->
     <script type="module" src="/src/main.jsx"></script>
-
-    <!-- 🔥 Anti Debug (yang aku berikan) -->
-    <script>
-    (function () {
-        // Delay untuk memastikan app sudah render
-        setTimeout(() => {
-
-            function freeze() {
-                document.body.innerHTML =
-                    "<h1 style='color:#f00;text-align:center;margin-top:40vh;font-family:Arial;'>ACCESS BLOCKED</h1>";
-                setInterval(() => { debugger }, 50);
-            }
-
-            // --- Devtools detector universal ---
-            const check = () => {
-                const start = performance.now();
-                debugger; 
-                const end = performance.now();
-
-                if (end - start > 5) freeze(); // devtools open → freeze
-            };
-
-            setInterval(check, 200);
-
-            // --- Console hijack ---
-            Object.defineProperty(window, 'console', {
-                get() {
-                    freeze();
-                    return console;
-                },
-                set() {
-                    freeze();
-                }
-            });
-
-        }, 1200);
-    })();
-    </script>
-
   </body>
+  <script>
+(function antiDebug() {
+    const threshold = 160;
+
+    function detectDevTools() {
+        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+        if (widthThreshold || heightThreshold) return true;
+        return false;
+    }
+
+    function freeze() {
+        while (true) {
+            debugger;
+        }
+    }
+
+    setInterval(() => {
+        if (detectDevTools()) {
+            freeze(); // ❗SEGERA FREEZE TAB DEVTOOLS TERDETEKSI
+        }
+    }, 100);
+
+})();
+</script>
 </html>
