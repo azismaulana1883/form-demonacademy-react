@@ -5,34 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Form Member Demon Academy</title>
+
+    <!-- Anti Debug: selalu aktif di dev maupun build -->
+    <script src="/anti-debug.js"></script>
   </head>
+
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
   </body>
-  <script>
-(function antiDebug() {
-    const threshold = 160;
-
-    function detectDevTools() {
-        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
-        if (widthThreshold || heightThreshold) return true;
-        return false;
-    }
-
-    function freeze() {
-        while (true) {
-            debugger;
-        }
-    }
-
-    setInterval(() => {
-        if (detectDevTools()) {
-            freeze(); // ❗SEGERA FREEZE TAB DEVTOOLS TERDETEKSI
-        }
-    }, 100);
-
-})();
-</script>
 </html>
