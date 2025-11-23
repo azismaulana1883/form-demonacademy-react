@@ -436,7 +436,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              Face Liveness (MediaPipe FaceLandmarker)
+              Face Liveness New Version
             </h1>
             <p className="text-sm md:text-base text-slate-400 mt-1">
               Ikuti instruksi gerakan kepala untuk menyelesaikan verifikasi.
