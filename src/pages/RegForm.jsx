@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
+import CameraFrame from "../components/CameraFrame.jsx";
 
 export default function RegForm() {
+  const [frameStatus, setFrameStatus] = useState("normal"); // ← FIX
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -172,7 +174,11 @@ export default function RegForm() {
                 </div>
               </div>
 
-              <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-black/80">
+              <CameraFrame
+                status={frameStatus}
+                cameraActive={cameraActive}
+                photo={photo}
+              >
                 {!photo ? (
                   <video
                     ref={videoRef}
@@ -187,19 +193,9 @@ export default function RegForm() {
                     className="h-full w-full object-cover"
                   />
                 )}
+              </CameraFrame>
 
-                {/* overlay jika kamera mati dan belum ada foto */}
-                {!cameraActive && !photo && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center px-4">
-                    <p className="text-sm font-medium text-slate-100">
-                      Kamera belum aktif
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Tekan tombol &quot;Aktifkan Kamera&quot; untuk memulai.
-                    </p>
-                  </div>
-                )}
-              </div>
+
 
               <canvas ref={canvasRef} className="hidden" />
 
