@@ -6,33 +6,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Form Member Demon Academy</title>
   </head>
+
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
+
   <script>
-(function antiDebug() {
+/* ================================
+      🔥 ANTI DEBUG + ANTI VIEW SOURCE
+   ================================ */
+
+(function SecurePage() {
+
+    /* ============================
+        1. ANTI DEVTOOLS (FREEZE)
+    ============================= */
     const threshold = 160;
 
     function detectDevTools() {
-        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
-        if (widthThreshold || heightThreshold) return true;
-        return false;
+        try {
+            const w = window.outerWidth - window.innerWidth;
+            const h = window.outerHeight - window.innerHeight;
+            return w > threshold || h > threshold;
+        } catch {
+            return false;
+        }
     }
 
-    function freeze() {
-        while (true) {
-            debugger;
-        }
+    function hardFreeze() {
+        setInterval(() => {
+            while (true) debugger;
+        }, 30);
     }
 
     setInterval(() => {
-        if (detectDevTools()) {
-            freeze(); // ❗SEGERA FREEZE TAB DEVTOOLS TERDETEKSI
+        if (detectDevTools()) hardFreeze();
+    }, 200);
+
+
+    /* ============================
+        2. BLOCK SHORTCUTS
+    ============================= */
+    document.addEventListener("keydown", (e) => {
+        // CTRL+U
+        if (e.ctrlKey && e.key === "u") e.preventDefault();
+        // CTRL+S
+        if (e.ctrlKey && e.key === "s") e.preventDefault();
+        // F12
+        if (e.key === "F12") e.preventDefault();
+        // CTRL+SHIFT+I
+        if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "i") e.preventDefault();
+        // CTRL+SHIFT+C
+        if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "c") e.preventDefault();
+        // CTRL+SHIFT+J
+        if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "j") e.preventDefault();
+        // CTRL+P
+        if (e.ctrlKey && e.key.toLowerCase() === "p") e.preventDefault();
+    });
+
+
+    /* ============================
+        3. BLOCK RIGHT CLICK
+    ============================= */
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+
+    /* ============================
+        4. BLOCK COPY/SELECT/DRAG
+    ============================= */
+    document.addEventListener("copy", (e) => e.preventDefault());
+    document.addEventListener("cut", (e) => e.preventDefault());
+    document.addEventListener("paste", (e) => e.preventDefault());
+    document.addEventListener("selectstart", (e) => e.preventDefault());
+    document.addEventListener("dragstart", (e) => e.preventDefault());
+
+
+    /* ============================
+        5. SELF DEFENDING CHECKER
+    ============================= */
+    (function selfDefend() {
+        function block() {
+            setTimeout(block, 50);
+            console.clear();
+            console.log = function(){};
+            console.warn = function(){};
+            console.error = function(){};
         }
-    }, 100);
+        block();
+    })();
 
 })();
-</script>
+  </script>
+
 </html>
