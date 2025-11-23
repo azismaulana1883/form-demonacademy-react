@@ -459,7 +459,7 @@ export default function FaceVerification({ onVerified }) {
                   </span>
                 </span>
                 <span className="text-[11px] font-mono uppercase tracking-widest text-slate-400">
-                  Liveness Mode
+                  Verification Live
                 </span>
               </div>
 
