@@ -538,7 +538,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
             </p>
             {genderDetected && (
               <p className="text-xs text-emerald-300 mt-1">
-                Rekomendasi gender terdeteksi: <b>{genderDetected}</b>
+                Anda adalah: <b>{genderDetected}</b>
               </p>
             )}
           </div>
