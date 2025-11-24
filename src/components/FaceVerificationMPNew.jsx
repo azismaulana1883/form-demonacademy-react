@@ -238,19 +238,20 @@ export default function FaceVerificationMPNew({ onVerified }) {
         .withAgeAndGender();
 
       if (detections && detections.gender) {
-        const g =
-          detections.gender === "male" ? "Laki-laki" : "Perempuan";
+        const g = detections.gender === "male" ? "Laki-laki" : "Perempuan";
+
         genderDetectOnceRef.current = true;
         setGenderDetected(g);
+
         try {
           localStorage.setItem(GENDER_KEY, g);
         } catch {}
-        setDebug((prev) => prev + ` | gender: ${g}`);
       }
     } catch (err) {
       console.error("Error detect gender:", err);
     }
   }, [isGenderModelReady]);
+
 
   const handleResults = useCallback(
     (results, timestamp) => {
@@ -442,10 +443,12 @@ export default function FaceVerificationMPNew({ onVerified }) {
       alert("Model belum siap. Tunggu sebentar lalu coba lagi.");
       return;
     }
-    const savedGender = localStorage.getItem(GENDER_KEY);
-    setGenderDetected(savedGender || "");
-    genderDetectOnceRef.current = !savedGender; 
-    // reset state yaw & hold
+
+    // Reset gender setiap kali user mulai verifikasi
+    setGenderDetected("");
+    genderDetectOnceRef.current = false;  // paksa deteksi ulang selalu
+
+    // reset yaw & hold
     neutralYaw.current = 0;
     yawSmooth.current = 0;
     calibFrames.current = 0;
@@ -456,10 +459,11 @@ export default function FaceVerificationMPNew({ onVerified }) {
     noFaceFrames.current = 0;
     setCalibCount(0);
     setFrameStatus("normal");
-    // progress dibiarkan (resume allowed)
+
     await startCamera();
     setPhase("calibrate");
   };
+
 
   const resetAll = () => {
     if (!window.confirm("Reset semua progress verifikasi?")) return;
