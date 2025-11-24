@@ -6,11 +6,26 @@ import React, {
   useCallback,
 } from "react";
 import { FilesetResolver, FaceLandmarker } from "@mediapipe/tasks-vision";
+import * as faceapi from "face-api.js";
 import LivenessFrame from "./LivenessFrame.jsx";
+import * as tf from '@tensorflow/tfjs';
 
 const STORAGE_KEY = "face_liveness_progress_v2";
+const GENDER_KEY = "detected_gender_v1";
 
 export default function FaceVerificationMPNew({ onVerified }) {
+  useEffect(() => {
+  async function setupBackend() {
+    try {
+      await tf.setBackend("cpu");
+      await tf.ready();
+      console.log("TF backend:", tf.getBackend());
+    } catch (err) {
+      console.error("TF backend error:", err);
+    }
+  }
+  setupBackend();
+}, []);
   const videoRef = useRef(null);
 
   const faceLandmarkerRef = useRef(null);
@@ -51,6 +66,17 @@ export default function FaceVerificationMPNew({ onVerified }) {
   const NEUTRAL_THRESHOLD = 0.012;
   const HOLD_FRAMES = 5;
 
+  // ==== STATE & REF UNTUK GENDER ====
+  const [isGenderModelReady, setIsGenderModelReady] = useState(false);
+  const [genderDetected, setGenderDetected] = useState(() => {
+    try {
+      return localStorage.getItem(GENDER_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+  const genderDetectOnceRef = useRef(false); // biar cuma ke-detect sekali
+
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
@@ -62,7 +88,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
     } catch {}
   }, [progress]);
 
-  // ================== INIT MODEL ==================
+  // ================== INIT MODEL LIVENESS (Mediapipe) ==================
   useEffect(() => {
     let cancelled = false;
 
@@ -115,6 +141,34 @@ export default function FaceVerificationMPNew({ onVerified }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ================== INIT MODEL GENDER (face-api.js) ==================
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadGenderModels() {
+      try {
+        // pastikan path ini sesuai dengan folder di public/
+        const MODEL_URL = "/models";
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL),
+        ]);
+        if (!cancelled) {
+          setIsGenderModelReady(true);
+          setDebug((prev) => prev + " | Gender model siap");
+        }
+      } catch (err) {
+        console.error("Error load gender models:", err);
+      }
+    }
+
+    loadGenderModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ================== CAMERA + LOOP ==================
   const stopCameraAndLoop = useCallback(() => {
     if (rafIdRef.current) {
@@ -135,7 +189,6 @@ export default function FaceVerificationMPNew({ onVerified }) {
       return Number.isFinite(v) ? v : null;
     };
 
-    // coba 3 titik dulu (nose + 2 mata)
     const noseX = getX(1);
     const leftEyeX = getX(263);
     const rightEyeX = getX(33);
@@ -148,7 +201,6 @@ export default function FaceVerificationMPNew({ onVerified }) {
       }
     }
 
-    // fallback: semua titik
     const xs = [];
     for (let i = 0; i < face.length; i++) {
       const v = face[i]?.x;
@@ -172,6 +224,39 @@ export default function FaceVerificationMPNew({ onVerified }) {
 
     return { yaw: yawRaw, mode: "allpts", pts: xs.length };
   };
+
+  // ================== DETEKSI GENDER (1x) ==================
+  const detectGenderOnce = useCallback(async () => {
+    if (
+      !videoRef.current ||
+      !isGenderModelReady ||
+      genderDetectOnceRef.current
+    ) {
+      return;
+    }
+
+    try {
+      const detections = await faceapi
+        .detectSingleFace(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions()
+        )
+        .withAgeAndGender();
+
+      if (detections && detections.gender) {
+        const g =
+          detections.gender === "male" ? "Laki-laki" : "Perempuan";
+        genderDetectOnceRef.current = true;
+        setGenderDetected(g);
+        try {
+          localStorage.setItem(GENDER_KEY, g);
+        } catch {}
+        setDebug((prev) => prev + ` | gender: ${g}`);
+      }
+    } catch (err) {
+      console.error("Error detect gender:", err);
+    }
+  }, [isGenderModelReady]);
 
   const handleResults = useCallback(
     (results, timestamp) => {
@@ -219,7 +304,9 @@ export default function FaceVerificationMPNew({ onVerified }) {
           4
         )} | neutral: ${baseNeutral.toFixed(4)} | delta: ${delta.toFixed(
           4
-        )} | mode: ${yawInfo.mode}${yawInfo.pts ? " | pts:" + yawInfo.pts : ""}`
+        )} | mode: ${yawInfo.mode}${
+          yawInfo.pts ? " | pts:" + yawInfo.pts : ""
+        } | gender: ${genderDetected || "-"}`
       );
 
       // ====== KALIBRASI ======
@@ -227,6 +314,11 @@ export default function FaceVerificationMPNew({ onVerified }) {
         calibFrames.current += 1;
         yawSum.current += yaw;
         setCalibCount(calibFrames.current);
+
+        // panggil deteksi gender sekali di awal kalibrasi
+        if (calibFrames.current === 8) {
+          detectGenderOnce();
+        }
 
         if (calibFrames.current >= 25) {
           neutralYaw.current = yawSum.current / calibFrames.current;
@@ -292,7 +384,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
         }, 900);
       }
     },
-    [onVerified, stopCameraAndLoop]
+    [detectGenderOnce, genderDetected, onVerified, stopCameraAndLoop]
   );
 
   const loopDetect = useCallback(() => {
@@ -367,7 +459,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
     noFaceFrames.current = 0;
     setCalibCount(0);
     setFrameStatus("normal");
-    setProgress((p) => p); // biarkan progress (resume allowed)
+    // progress dibiarkan (resume allowed)
     await startCamera();
     setPhase("calibrate");
   };
@@ -376,6 +468,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
     if (!window.confirm("Reset semua progress verifikasi?")) return;
     try {
       localStorage.removeItem(STORAGE_KEY);
+      // gender sengaja TIDAK dihapus, biar tetap kepake ke form
     } catch {}
     setProgress(0);
     setPhase("idle");
@@ -389,6 +482,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
     leftHold.current = 0;
     centerHold.current = 0;
     noFaceFrames.current = 0;
+    genderDetectOnceRef.current = false;
     stopCameraAndLoop();
   };
 
@@ -441,6 +535,11 @@ export default function FaceVerificationMPNew({ onVerified }) {
             <p className="text-sm md:text-base text-slate-400 mt-1">
               Ikuti instruksi gerakan kepala untuk menyelesaikan verifikasi.
             </p>
+            {genderDetected && (
+              <p className="text-xs text-emerald-300 mt-1">
+                Rekomendasi gender terdeteksi: <b>{genderDetected}</b>
+              </p>
+            )}
           </div>
 
           <button
@@ -465,7 +564,9 @@ export default function FaceVerificationMPNew({ onVerified }) {
           </button>
         </div>
 
-        {/* Main card */}
+        {/* Main card (sisanya tetap seperti punyamu tadi) */}
+        {/* ... (biarkan layout steps + debug sama seperti kode awalmu, yang di bawah ini sudah sama) */}
+
         <div className="grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-6 items-start">
           {/* Video + status */}
           <div className="space-y-4">
@@ -552,10 +653,9 @@ export default function FaceVerificationMPNew({ onVerified }) {
                         {stepLabel(step)}
                       </p>
                     </div>
-                    {progress + 1 === step &&
-                      phase === "verify" && (
-                        <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
-                      )}
+                    {progress + 1 === step && phase === "verify" && (
+                      <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
+                    )}
                   </div>
                 ))}
               </div>

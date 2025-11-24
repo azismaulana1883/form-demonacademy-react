@@ -1,7 +1,11 @@
+// src/pages/RegForm.jsx (atau sesuai strukturmu)
 import React, { useRef, useState, useEffect } from "react";
 import CameraFrame from "../components/CameraFrame.jsx";
 import FormInput from "../components/FormInputReg.jsx";
 import DomisiliSelect from "../components/DomisiliSelect.jsx";
+import Select from "react-select";
+
+const GENDER_KEY = "detected_gender_v1";
 
 export default function RegForm() {
   const [frameStatus, setFrameStatus] = useState("normal");
@@ -20,6 +24,16 @@ export default function RegForm() {
   const [tempatLahir, setTempatLahir] = useState("");
   const [jabatan, setJabatan] = useState("");
   const [anime, setAnime] = useState("");
+
+  // Jenis Kelamin (auto dari localStorage)
+  const [gender, setGender] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return localStorage.getItem(GENDER_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
 
   // ============================
   // DOMISILI STATE
@@ -89,11 +103,6 @@ export default function RegForm() {
 
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play();
-          console.log(
-            "VIDEO READY:",
-            videoRef.current.videoWidth,
-            videoRef.current.videoHeight
-          );
         };
       }
     } catch (err) {
@@ -111,9 +120,7 @@ export default function RegForm() {
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    // Metadata belum siap
     if (video.readyState < 2) {
-      console.log("Video belum siap, retry...");
       return setTimeout(takePhoto, 250);
     }
 
@@ -121,7 +128,6 @@ export default function RegForm() {
     let h = video.videoHeight;
 
     if (w === 0 || h === 0) {
-      console.log("Resolusi 0, retry...");
       return setTimeout(takePhoto, 250);
     }
 
@@ -137,7 +143,6 @@ export default function RegForm() {
     stopCamera();
   };
 
-  // Stop kamera saat unmount
   useEffect(() => {
     return () => {
       if (stream) stream.getTracks().forEach((t) => t.stop());
@@ -155,6 +160,7 @@ export default function RegForm() {
     if (!tempatLahir.trim()) e.tempat = "Tempat lahir wajib diisi.";
     if (!jabatan.trim()) e.jabatan = "Jabatan wajib diisi.";
     if (!anime.trim()) e.anime = "Anime kesukaan wajib diisi.";
+    if (!gender.trim()) e.gender = "Jenis kelamin wajib dipilih.";
 
     if (!selectedProvince) e.province = "Provinsi wajib dipilih.";
     if (!selectedRegency) e.regency = "Kabupaten wajib dipilih.";
@@ -168,7 +174,7 @@ export default function RegForm() {
   };
 
   useEffect(() => {
-    setErrors(prev => {
+    setErrors((prev) => {
       const updated = { ...prev };
 
       if (nama.trim()) delete updated.nama;
@@ -177,6 +183,7 @@ export default function RegForm() {
       if (tempatLahir.trim()) delete updated.tempat;
       if (jabatan.trim()) delete updated.jabatan;
       if (anime.trim()) delete updated.anime;
+      if (gender.trim()) delete updated.gender;
 
       if (selectedProvince) delete updated.province;
       if (selectedRegency) delete updated.regency;
@@ -194,11 +201,12 @@ export default function RegForm() {
     tempatLahir,
     jabatan,
     anime,
+    gender,
     selectedProvince,
     selectedRegency,
     selectedDistrict,
     selectedVillage,
-    photo
+    photo,
   ]);
 
   const handleSubmit = () => {
@@ -234,13 +242,17 @@ export default function RegForm() {
     singleValue: (base) => ({ ...base, color: "#fff" }),
   };
 
+  const genderOptions = [
+    { value: "Laki-laki", label: "Laki-laki" },
+    { value: "Perempuan", label: "Perempuan" },
+  ];
+
   // ============================
-  // RENDER (UI CANTIK TETAP)
+  // RENDER
   // ============================
   return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-5xl">
-
         {/* HEADER */}
         <div className="mb-8 flex items-center justify-between gap-3">
           <div>
@@ -255,17 +267,67 @@ export default function RegForm() {
 
         {/* GRID */}
         <div className="relative rounded-3xl transition-all duration-300">
-
           <div className="grid gap-10 md:grid-cols-[1.3fr_1fr] relative z-10">
-
             {/* FORM */}
             <div className="space-y-6">
-              <FormInput label="Nama Lengkap" value={nama} setValue={setNama} error={errors.nama} />
-              <FormInput label="Nickname" value={nickname} setValue={setNickname} error={errors.nickname} />
-              <FormInput label="Tanggal Lahir" type="date" value={tanggalLahir} setValue={setTanggalLahir} error={errors.tanggal} />
-              <FormInput label="Tempat Lahir" value={tempatLahir} setValue={setTempatLahir} error={errors.tempat} />
-              <FormInput label="Jabatan" value={jabatan} setValue={setJabatan} error={errors.jabatan} />
-              <FormInput label="Anime Kesukaan" value={anime} setValue={setAnime} error={errors.anime} />
+              <FormInput
+                label="Nama Lengkap"
+                value={nama}
+                setValue={setNama}
+                error={errors.nama}
+              />
+              <FormInput
+                label="Nickname"
+                value={nickname}
+                setValue={setNickname}
+                error={errors.nickname}
+              />
+              <FormInput
+                label="Tanggal Lahir"
+                type="date"
+                value={tanggalLahir}
+                setValue={setTanggalLahir}
+                error={errors.tanggal}
+              />
+              <FormInput
+                label="Tempat Lahir"
+                value={tempatLahir}
+                setValue={setTempatLahir}
+                error={errors.tempat}
+              />
+              <FormInput
+                label="Jabatan"
+                value={jabatan}
+                setValue={setJabatan}
+                error={errors.jabatan}
+              />
+              <FormInput
+                label="Anime Kesukaan"
+                value={anime}
+                setValue={setAnime}
+                error={errors.anime}
+              />
+
+              {/* Jenis Kelamin - react-select + auto filled */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Jenis Kelamin
+                </label>
+                <Select
+                  value={
+                    genderOptions.find((opt) => opt.value === gender) || null
+                  }
+                  onChange={(opt) => setGender(opt ? opt.value : "")}
+                  options={genderOptions}
+                  styles={selectStyles}
+                  placeholder="Pilih jenis kelamin"
+                />
+                {errors.gender && (
+                  <p className="text-red-400 text-xs mt-1">
+                    {errors.gender}
+                  </p>
+                )}
+              </div>
 
               <DomisiliSelect
                 provinces={provinces}
@@ -294,68 +356,76 @@ export default function RegForm() {
             </div>
 
             {/* CAMERA */}
-          <div className="space-y-4">
-            <CameraFrame status={frameStatus} cameraActive={cameraActive} photo={photo}>
-              {!photo ? (
-                <video ref={videoRef} autoPlay playsInline className="h-full w-full object-cover" />
-              ) : (
-                <img src={photo} alt="Foto hasil" className="h-full w-full object-cover" />
-              )}
-            </CameraFrame>
+            <div className="space-y-4">
+              <CameraFrame
+                status={frameStatus}
+                cameraActive={cameraActive}
+                photo={photo}
+              >
+                {!photo ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={photo}
+                    alt="Foto hasil"
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </CameraFrame>
 
-            <canvas ref={canvasRef} className="hidden" />
+              <canvas ref={canvasRef} className="hidden" />
 
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              {!cameraActive ? (
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                {!cameraActive ? (
+                  <button
+                    onClick={startCamera}
+                    className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
+                  >
+                    Aktifkan Kamera
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopCamera}
+                    className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
+                  >
+                    Matikan Kamera
+                  </button>
+                )}
+
                 <button
-                  onClick={startCamera}
-                  className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
-                >
-                  Aktifkan Kamera
-                </button>
-              ) : (
-                <button
-                  onClick={stopCamera}
-                  className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
-                >
-                  Matikan Kamera
-                </button>
-              )}
-
-              <button
-                type="button"
-                disabled={!cameraActive}
-                onClick={takePhoto}
-                className={`
-                  px-3 py-2.5 rounded-2xl text-sm font-medium transition
-                  ${
+                  type="button"
+                  disabled={!cameraActive}
+                  onClick={takePhoto}
+                  className={`px-3 py-2.5 rounded-2xl text-sm font-medium transition ${
                     cameraActive
                       ? "bg-emerald-600 text-white hover:bg-emerald-500"
                       : "bg-slate-700 text-slate-500 cursor-not-allowed"
-                  }
-                `}
-              >
-                Ambil Foto
-              </button>
-            </div>
+                  }`}
+                >
+                  Ambil Foto
+                </button>
+              </div>
 
-            {photo && (
-              <button
+              {photo && (
+                <button
                   onClick={() => setPhoto(null)}
                   className="mx-auto block bg-slate-800 px-6 py-2.5 rounded-2xl text-sm"
                 >
                   Ulangi Foto
-              </button>
+                </button>
+              )}
 
-            )}
-
-            {errors.photo && <p className="text-red-400 text-xs">{errors.photo}</p>}
+              {errors.photo && (
+                <p className="text-red-400 text-xs">{errors.photo}</p>
+              )}
+            </div>
           </div>
-
-          </div>
-
         </div>
-
       </div>
     </div>
   );
