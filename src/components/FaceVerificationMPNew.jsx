@@ -68,13 +68,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
 
   // ==== STATE & REF UNTUK GENDER ====
   const [isGenderModelReady, setIsGenderModelReady] = useState(false);
-  const [genderDetected, setGenderDetected] = useState(() => {
-    try {
-      return localStorage.getItem(GENDER_KEY) || "";
-    } catch {
-      return "";
-    }
-  });
+  const [genderDetected, setGenderDetected] = useState("");
   const genderDetectOnceRef = useRef(false); // biar cuma ke-detect sekali
 
   useEffect(() => {
@@ -448,6 +442,9 @@ export default function FaceVerificationMPNew({ onVerified }) {
       alert("Model belum siap. Tunggu sebentar lalu coba lagi.");
       return;
     }
+    const savedGender = localStorage.getItem(GENDER_KEY);
+    setGenderDetected(savedGender || "");
+    genderDetectOnceRef.current = !savedGender; 
     // reset state yaw & hold
     neutralYaw.current = 0;
     yawSmooth.current = 0;
@@ -661,7 +658,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/5 bg-black/60 px-3.5 py-3 font-mono text-xs md:text-sm text-slate-300">
+            {/* <div className="rounded-xl border border-white/5 bg-black/60 px-3.5 py-3 font-mono text-xs md:text-sm text-slate-300">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
                   DEBUG
@@ -673,7 +670,7 @@ export default function FaceVerificationMPNew({ onVerified }) {
               <div className="text-slate-200 break-words min-h-[2rem]">
                 {debug}
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
