@@ -1,9 +1,11 @@
-// src/pages/RegForm.jsx (atau sesuai strukturmu)
+// src/pages/RegForm.jsx
 import React, { useRef, useState, useEffect } from "react";
 import CameraFrame from "../components/CameraFrame.jsx";
 import FormInput from "../components/FormInputReg.jsx";
 import DomisiliSelect from "../components/DomisiliSelect.jsx";
 import Select from "react-select";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 const GENDER_KEY = "detected_gender_v1";
 
@@ -14,20 +16,20 @@ export default function RegForm() {
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState(null);
   const [photo, setPhoto] = useState(null);
+  const navigate = useNavigate();
 
-  // ============================
-  // FORM INPUT STATE
-  // ============================
+  // POPUP UNIQUE KEY
+  const [showPopup, setShowPopup] = useState(false);
+  const [uniqueKey, setUniqueKey] = useState("");
+
+  // FORM INPUT
   const [nama, setNama] = useState("");
   const [nickname, setNickname] = useState("");
   const [tanggalLahir, setTanggalLahir] = useState("");
   const [tempatLahir, setTempatLahir] = useState("");
   const [jabatan, setJabatan] = useState("");
-  const [anime, setAnime] = useState("");
 
-  // Jenis Kelamin (auto dari localStorage)
   const [gender, setGender] = useState(() => {
-    if (typeof window === "undefined") return "";
     try {
       return localStorage.getItem(GENDER_KEY) || "";
     } catch {
@@ -35,9 +37,7 @@ export default function RegForm() {
     }
   });
 
-  // ============================
-  // DOMISILI STATE
-  // ============================
+  // DOMISILI
   const [provinces, setProvinces] = useState([]);
   const [regencies, setRegencies] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -50,9 +50,7 @@ export default function RegForm() {
 
   const [errors, setErrors] = useState({});
 
-  // ============================
-  // FETCH DOMISILI
-  // ============================
+  // FETCH DATA DOMISILI
   useEffect(() => {
     fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
       .then((res) => res.json())
@@ -86,9 +84,7 @@ export default function RegForm() {
       .then((data) => setVillages(data));
   }, [selectedDistrict]);
 
-  // ============================
   // CAMERA
-  // ============================
   const startCamera = async () => {
     try {
       const cam = await navigator.mediaDevices.getUserMedia({
@@ -100,13 +96,10 @@ export default function RegForm() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = cam;
-
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play();
-        };
+        videoRef.current.onloadedmetadata = () => videoRef.current.play();
       }
-    } catch (err) {
-      alert("Tidak bisa membuka kamera.");
+    } catch {
+      toast.error("Tidak bisa membuka kamera.");
     }
   };
 
@@ -120,26 +113,16 @@ export default function RegForm() {
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    if (video.readyState < 2) {
-      return setTimeout(takePhoto, 250);
-    }
+    if (video.readyState < 2) return setTimeout(takePhoto, 250);
 
-    let w = video.videoWidth;
-    let h = video.videoHeight;
-
-    if (w === 0 || h === 0) {
-      return setTimeout(takePhoto, 250);
-    }
-
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, w, h);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const imageBase64 = canvas.toDataURL("image/png");
-    setPhoto(imageBase64);
-
+    const base64 = canvas.toDataURL("image/png");
+    setPhoto(base64);
     stopCamera();
   };
 
@@ -149,9 +132,7 @@ export default function RegForm() {
     };
   }, [stream]);
 
-  // ============================
-  // VALIDATION
-  // ============================
+  // VALIDASI
   const validateForm = () => {
     const e = {};
     if (!nama.trim()) e.nama = "Nama wajib diisi.";
@@ -159,84 +140,96 @@ export default function RegForm() {
     if (!tanggalLahir.trim()) e.tanggal = "Tanggal lahir wajib diisi.";
     if (!tempatLahir.trim()) e.tempat = "Tempat lahir wajib diisi.";
     if (!jabatan.trim()) e.jabatan = "Jabatan wajib diisi.";
-    if (!anime.trim()) e.anime = "Anime kesukaan wajib diisi.";
     if (!gender.trim()) e.gender = "Jenis kelamin wajib dipilih.";
-
     if (!selectedProvince) e.province = "Provinsi wajib dipilih.";
     if (!selectedRegency) e.regency = "Kabupaten wajib dipilih.";
     if (!selectedDistrict) e.district = "Kecamatan wajib dipilih.";
     if (!selectedVillage) e.village = "Kelurahan wajib dipilih.";
-
     if (!photo) e.photo = "Foto wajib diambil.";
 
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  useEffect(() => {
-    setErrors((prev) => {
-      const updated = { ...prev };
+  // HANDLE SUBMIT
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast.error("Masih ada yang belum diisi!");
+      return;
+    }
 
-      if (nama.trim()) delete updated.nama;
-      if (nickname.trim()) delete updated.nickname;
-      if (tanggalLahir.trim()) delete updated.tanggal;
-      if (tempatLahir.trim()) delete updated.tempat;
-      if (jabatan.trim()) delete updated.jabatan;
-      if (anime.trim()) delete updated.anime;
-      if (gender.trim()) delete updated.gender;
+    const payload = {
+      nama,
+      nickname,
+      tanggal_lahir: tanggalLahir,
+      tempat_lahir: tempatLahir,
+      jabatan,
+      jenis_kelamin: gender,
+      prov: provinces.find((p) => p.id == selectedProvince)?.name || "",
+      kab: regencies.find((r) => r.id == selectedRegency)?.name || "",
+      kec: districts.find((d) => d.id == selectedDistrict)?.name || "",
+      kel: villages.find((v) => v.id == selectedVillage)?.name || "",
+      foto_base64: photo,
+    };
 
-      if (selectedProvince) delete updated.province;
-      if (selectedRegency) delete updated.regency;
-      if (selectedDistrict) delete updated.district;
-      if (selectedVillage) delete updated.village;
+    try {
+      // const res = await fetch("http://192.168.100.41:3000/api/biodata", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify(payload),
+      // });
 
-      if (photo) delete updated.photo;
+      const res = await fetch("https://api-suffergatte.vercel.app/api/biodata/get-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      return updated;
-    });
-  }, [
-    nama,
-    nickname,
-    tanggalLahir,
-    tempatLahir,
-    jabatan,
-    anime,
-    gender,
-    selectedProvince,
-    selectedRegency,
-    selectedDistrict,
-    selectedVillage,
-    photo,
-  ]);
+      const data = await res.json();
 
-  const handleSubmit = () => {
-    if (!validateForm()) return;
-    alert("Form valid!.");
+      if (!data.success) {
+        toast.error(data.message);
+        return;
+      }
+
+      // === SUCCESS ===
+      setUniqueKey(data.unique_key);
+      setShowPopup(true);
+    } catch (err) {
+      toast.error("Server error.");
+    }
   };
 
-  // ============================
+  // COPY UNIQUE KEY → tutup popup dulu, baru redirect
+  const copyUniqueKey = () => {
+    navigator.clipboard.writeText(uniqueKey);
+    toast.success("Unique Key disalin!");
+
+    // Tutup popup di halaman ini
+    setShowPopup(false);
+
+    // Setelah itu redirect ke /members (reset semua state & popup)
+    setTimeout(() => {
+      window.location.href = "/members";
+    }, 200); // boleh 0-200ms, cuma buat rasa smooth aja
+  };
+
   // SELECT STYLE
-  // ============================
   const selectStyles = {
-    control: (base, state) => ({
+    control: (base) => ({
       ...base,
       backgroundColor: "rgba(15,23,42,0.6)",
       borderRadius: "1rem",
-      borderColor: state.isFocused ? "#6366f1" : "rgba(51,65,85,0.8)",
+      borderColor: "rgba(148,163,184,0.5)",
       padding: "4px",
-      boxShadow: state.isFocused ? "0 0 0 2px rgba(99,102,241,0.4)" : "none",
       color: "#fff",
     }),
-    menu: (base) => ({
-      ...base,
-      backgroundColor: "#0f172a",
-      color: "#fff",
-    }),
+    menu: (base) => ({ ...base, backgroundColor: "#0f172a", color: "#fff" }),
     option: (base, state) => ({
       ...base,
       backgroundColor: state.isFocused
         ? "rgba(99,102,241,0.4)"
-        : "rgba(15,23,42,0.6)",
+        : "transparent",
       color: "#fff",
     }),
     singleValue: (base) => ({ ...base, color: "#fff" }),
@@ -247,183 +240,194 @@ export default function RegForm() {
     { value: "Perempuan", label: "Perempuan" },
   ];
 
-  // ============================
-  // RENDER
-  // ============================
   return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-5xl">
-        {/* HEADER */}
-        <div className="mb-8 flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              Form Registrasi Pengguna
-            </h1>
-            <p className="text-sm md:text-base text-slate-400 mt-1">
-              Lengkapi data dan ambil foto wajah untuk menyelesaikan proses.
+      {/* === POPUP UNIQUE KEY === */}
+      {showPopup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800 p-6 rounded-2xl shadow-xl w-80 text-center">
+            <h2 className="text-xl font-bold text-white mb-3">
+              Registrasi Berhasil!
+            </h2>
+
+            <p className="text-slate-300 text-sm mb-2">
+              Ini adalah <span className="font-semibold">Unique Key</span> kamu:
             </p>
+
+            <div className="bg-slate-900 text-indigo-300 font-mono p-3 rounded-xl border border-indigo-500 mb-4">
+              {uniqueKey}
+            </div>
+
+            <button
+              onClick={copyUniqueKey}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl transition"
+            >
+              Salin & Lanjutkan
+            </button>
           </div>
         </div>
+      )}
 
-        {/* GRID */}
-        <div className="relative rounded-3xl transition-all duration-300">
-          <div className="grid gap-10 md:grid-cols-[1.3fr_1fr] relative z-10">
-            {/* FORM */}
-            <div className="space-y-6">
-              <FormInput
-                label="Nama Lengkap"
-                value={nama}
-                setValue={setNama}
-                error={errors.nama}
-              />
-              <FormInput
-                label="Nickname"
-                value={nickname}
-                setValue={setNickname}
-                error={errors.nickname}
-              />
-              <FormInput
-                label="Tanggal Lahir"
-                type="date"
-                value={tanggalLahir}
-                setValue={setTanggalLahir}
-                error={errors.tanggal}
-              />
-              <FormInput
-                label="Tempat Lahir"
-                value={tempatLahir}
-                setValue={setTempatLahir}
-                error={errors.tempat}
-              />
-              <FormInput
-                label="Jabatan"
-                value={jabatan}
-                setValue={setJabatan}
-                error={errors.jabatan}
-              />
-              <FormInput
-                label="Anime Kesukaan"
-                value={anime}
-                setValue={setAnime}
-                error={errors.anime}
-              />
+      <div className="w-full max-w-5xl">
+        {/* HEADER */}
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
+            Form Registrasi Pengguna
+          </h1>
+          <p className="text-sm md:text-base text-slate-400 mt-1">
+            Lengkapi data dan ambil foto wajah untuk menyelesaikan proses.
+          </p>
+        </div>
 
-              {/* Jenis Kelamin - react-select + auto filled */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Jenis Kelamin
-                </label>
-                <Select
-                  value={
-                    genderOptions.find((opt) => opt.value === gender) || null
-                  }
-                  onChange={(opt) => setGender(opt ? opt.value : "")}
-                  options={genderOptions}
-                  styles={selectStyles}
-                  placeholder="Pilih jenis kelamin"
+        {/* FORM GRID */}
+        <div className="grid gap-10 md:grid-cols-[1.3fr_1fr]">
+          {/* FORM */}
+          <div className="space-y-6">
+            <FormInput
+              label="Nama Lengkap"
+              value={nama}
+              setValue={setNama}
+              error={errors.nama}
+            />
+            <FormInput
+              label="Nickname"
+              value={nickname}
+              setValue={setNickname}
+              error={errors.nickname}
+            />
+            <FormInput
+              label="Tanggal Lahir"
+              type="date"
+              value={tanggalLahir}
+              setValue={setTanggalLahir}
+              error={errors.tanggal}
+            />
+            <FormInput
+              label="Tempat Lahir"
+              value={tempatLahir}
+              setValue={setTempatLahir}
+              error={errors.tempat}
+            />
+            <FormInput
+              label="Jabatan"
+              value={jabatan}
+              setValue={setJabatan}
+              error={errors.jabatan}
+            />
+
+            {/* SELECT GENDER */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Jenis Kelamin
+              </label>
+              <Select
+                value={genderOptions.find((opt) => opt.value === gender) || null}
+                onChange={(opt) => setGender(opt ? opt.value : "")}
+                options={genderOptions}
+                styles={selectStyles}
+                placeholder="Pilih jenis kelamin"
+              />
+              {errors.gender && (
+                <p className="text-red-400 text-xs mt-1">{errors.gender}</p>
+              )}
+            </div>
+
+            {/* DOMISILI */}
+            <DomisiliSelect
+              provinces={provinces}
+              regencies={regencies}
+              districts={districts}
+              villages={villages}
+              selectedProvince={selectedProvince}
+              selectedRegency={selectedRegency}
+              selectedDistrict={selectedDistrict}
+              selectedVillage={selectedVillage}
+              setSelectedProvince={setSelectedProvince}
+              setSelectedRegency={setSelectedRegency}
+              setSelectedDistrict={setSelectedDistrict}
+              setSelectedVillage={setSelectedVillage}
+              selectStyles={selectStyles}
+              errors={errors}
+            />
+
+            {/* SUBMIT BUTTON */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-4 py-3 text-sm font-semibold text-white"
+            >
+              Submit Form
+            </button>
+          </div>
+
+          {/* CAMERA */}
+          <div className="space-y-4">
+            <CameraFrame
+              status={frameStatus}
+              cameraActive={cameraActive}
+              photo={photo}
+            >
+              {!photo ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="h-full w-full object-cover"
                 />
-                {errors.gender && (
-                  <p className="text-red-400 text-xs mt-1">
-                    {errors.gender}
-                  </p>
-                )}
-              </div>
+              ) : (
+                <img
+                  src={photo}
+                  alt="Foto hasil"
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </CameraFrame>
 
-              <DomisiliSelect
-                provinces={provinces}
-                regencies={regencies}
-                districts={districts}
-                villages={villages}
-                selectedProvince={selectedProvince}
-                selectedRegency={selectedRegency}
-                selectedDistrict={selectedDistrict}
-                selectedVillage={selectedVillage}
-                setSelectedProvince={setSelectedProvince}
-                setSelectedRegency={setSelectedRegency}
-                setSelectedDistrict={setSelectedDistrict}
-                setSelectedVillage={setSelectedVillage}
-                selectStyles={selectStyles}
-                errors={errors}
-              />
+            <canvas ref={canvasRef} className="hidden" />
+
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              {!cameraActive ? (
+                <button
+                  onClick={startCamera}
+                  className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
+                >
+                  Aktifkan Kamera
+                </button>
+              ) : (
+                <button
+                  onClick={stopCamera}
+                  className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
+                >
+                  Matikan Kamera
+                </button>
+              )}
 
               <button
                 type="button"
-                onClick={handleSubmit}
-                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white"
+                disabled={!cameraActive}
+                onClick={takePhoto}
+                className={`px-3 py-2.5 rounded-2xl text-sm font-medium transition ${
+                  cameraActive
+                    ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                    : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                }`}
               >
-                Submit Form
+                Ambil Foto
               </button>
             </div>
 
-            {/* CAMERA */}
-            <div className="space-y-4">
-              <CameraFrame
-                status={frameStatus}
-                cameraActive={cameraActive}
-                photo={photo}
+            {photo && (
+              <button
+                onClick={() => setPhoto(null)}
+                className="mx-auto block bg-slate-800 px-6 py-2.5 rounded-2xl text-sm"
               >
-                {!photo ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <img
-                    src={photo}
-                    alt="Foto hasil"
-                    className="h-full w-full object-cover"
-                  />
-                )}
-              </CameraFrame>
+                Ulangi Foto
+              </button>
+            )}
 
-              <canvas ref={canvasRef} className="hidden" />
-
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                {!cameraActive ? (
-                  <button
-                    onClick={startCamera}
-                    className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
-                  >
-                    Aktifkan Kamera
-                  </button>
-                ) : (
-                  <button
-                    onClick={stopCamera}
-                    className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
-                  >
-                    Matikan Kamera
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  disabled={!cameraActive}
-                  onClick={takePhoto}
-                  className={`px-3 py-2.5 rounded-2xl text-sm font-medium transition ${
-                    cameraActive
-                      ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                      : "bg-slate-700 text-slate-500 cursor-not-allowed"
-                  }`}
-                >
-                  Ambil Foto
-                </button>
-              </div>
-
-              {photo && (
-                <button
-                  onClick={() => setPhoto(null)}
-                  className="mx-auto block bg-slate-800 px-6 py-2.5 rounded-2xl text-sm"
-                >
-                  Ulangi Foto
-                </button>
-              )}
-
-              {errors.photo && (
-                <p className="text-red-400 text-xs">{errors.photo}</p>
-              )}
-            </div>
+            {errors.photo && (
+              <p className="text-red-400 text-xs">{errors.photo}</p>
+            )}
           </div>
         </div>
       </div>
