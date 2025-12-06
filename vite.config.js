@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import javascriptObfuscator from 'vite-plugin-javascript-obfuscator'
+import copy from 'rollup-plugin-copy'
 
 export default defineConfig(({ command }) => {
   const isBuild = command === 'build'
@@ -11,52 +12,37 @@ export default defineConfig(({ command }) => {
     plugins: [
       react(),
 
-      // 🔥 Obfuscate HANYA saat build, biar dev tetap waras
+      // ⬇⬇⬇ Tambahkan plugin copy KESINI
+      copy({
+        targets: [
+          { src: 'public/_redirects', dest: 'dist' }  // WAJIB ADA
+        ],
+        hook: 'writeBundle'
+      }),
+
+      // 🔥 Obfuscate HANYA saat build
       isBuild &&
         javascriptObfuscator({
-          // === MODE BRUTAL ===
           compact: true,
-
-          // Control flow diacak total
           controlFlowFlattening: true,
           controlFlowFlatteningThreshold: 1,
-
-          // Tambah dead code di mana-mana
           deadCodeInjection: true,
           deadCodeInjectionThreshold: 1,
-
-          // Semua string dimasukin ke array + diencode RC4
           stringArray: true,
           stringArrayEncoding: ['rc4'],
           stringArrayThreshold: 1,
           rotateStringArray: true,
           shuffleStringArray: true,
-
-          // Pecah string biar susah search
           splitStrings: true,
           splitStringsChunkLength: 3,
-
-          // Bikin fungsi / kode susah di-modif balik
           selfDefending: true,
-
-          // Anti-debugger (DevTools bakal ke-dodge / lag)
           debugProtection: true,
-          debugProtectionInterval: 4000, // ms, harus number > 0
-
-          // Hilangin semua console output
+          debugProtectionInterval: 4000,
           disableConsoleOutput: true,
-
-          // Tambah kekacauan ekstra
           transformObjectKeys: true,
           numbersToExpressions: true,
           simplify: true,
-
-          // Rename ke global scope juga (paling agresif)
           renameGlobals: true,
-
-          // (Optional) kalau mau nambah:
-          // identifierNamesGenerator: 'hexadecimal',
-          // unicodeEscapeSequence: true,
         }),
     ].filter(Boolean),
 
