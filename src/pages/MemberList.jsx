@@ -10,13 +10,27 @@ export default function MemberList() {
   const [search, setSearch] = useState("");
   const [filterGender, setFilterGender] = useState("All");
 
-  // POPUP STATE
+  // POPUP EDIT
   const [showPopup, setShowPopup] = useState(false);
   const [editId, setEditId] = useState(null);
   const [oldNickname, setOldNickname] = useState("");
   const [newNickname, setNewNickname] = useState("");
   const [uniqueKeyInput, setUniqueKeyInput] = useState("");
   const [loadingUpdate, setLoadingUpdate] = useState(false);
+
+  // POPUP FOTO
+  const [showPhotoPopup, setShowPhotoPopup] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+
+  const openPhoto = (url) => {
+    setSelectedPhoto(url);
+    setShowPhotoPopup(true);
+  };
+
+  const closePhoto = () => {
+    setSelectedPhoto(null);
+    setShowPhotoPopup(false);
+  };
 
   function formatDateID(dateString) {
     const date = new Date(dateString);
@@ -63,7 +77,7 @@ export default function MemberList() {
     setFiltered(r);
   }, [search, filterGender, members]);
 
-  // OPEN POPUP
+  // OPEN EDIT POPUP
   const openEditPopup = (member) => {
     setEditId(member.id);
     setOldNickname(member.nickname);
@@ -72,7 +86,7 @@ export default function MemberList() {
     setShowPopup(true);
   };
 
-  // SAVE
+  // SAVE NEW NICKNAME
   const saveNickname = async () => {
     if (!uniqueKeyInput.trim()) return toast.error("Unique key wajib diisi!");
     if (!newNickname.trim()) return toast.error("Nickname baru wajib diisi!");
@@ -115,10 +129,23 @@ export default function MemberList() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-700 px-6 py-12 text-white">
-
       <Toaster position="top-center" />
 
-      {/* POPUP */}
+      {/* ======================= POPUP FOTO ======================= */}
+      {showPhotoPopup && (
+        <div
+          onClick={closePhoto}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50"
+        >
+          <img
+            src={selectedPhoto}
+            alt="Preview"
+            className="max-w-[90%] max-h-[90%] rounded-2xl shadow-2xl border border-white/20"
+          />
+        </div>
+      )}
+
+      {/* ======================= POPUP EDIT ======================= */}
       {showPopup && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-800 w-96 rounded-2xl shadow-2xl p-6 border border-white/10">
@@ -167,14 +194,13 @@ export default function MemberList() {
         </div>
       )}
 
-      {/* TITLE */}
+      {/* ======================= TITLE ======================= */}
       <h1 className="text-4xl font-extrabold text-center mb-10 tracking-wide drop-shadow-lg">
         SUFFERGATTE — Members
       </h1>
 
-      {/* FILTER */}
+      {/* ======================= FILTER ======================= */}
       <div className="max-w-5xl mx-auto mb-10 flex flex-col md:flex-row gap-4 items-center justify-between bg-white/10 backdrop-blur-md border border-white/10 px-6 py-4 rounded-2xl shadow-xl">
-        
         <input
           type="text"
           placeholder="Cari nama / nickname..."
@@ -200,18 +226,22 @@ export default function MemberList() {
         </div>
       </div>
 
-      {/* GRID */}
+      {/* ======================= GRID MEMBER ======================= */}
       <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.map((m) => (
           <div
             key={m.id}
             className="bg-slate-800 rounded-2xl border border-white/10 shadow-xl overflow-hidden transition hover:scale-[1.03] hover:shadow-2xl"
           >
-            <div className="h-56 w-full overflow-hidden">
+            {/* FOTO CARD */}
+            <div
+              className="h-56 w-full overflow-hidden cursor-pointer group"
+              onClick={() => openPhoto(m.path)}
+            >
               <img
                 src={m.path}
                 alt={m.nama}
-                className="w-full h-full object-cover transition hover:scale-110"
+                className="w-full h-full object-cover transition duration-500 group-hover:scale-110"
               />
             </div>
 
@@ -222,7 +252,9 @@ export default function MemberList() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-slate-400">Nickname</p>
-                  <p className="text-xl font-bold text-blue-400">{m.nickname}</p>
+                  <p className="text-xl font-bold text-blue-400">
+                    {m.nickname}
+                  </p>
                 </div>
 
                 <button onClick={() => openEditPopup(m)}>
@@ -237,12 +269,13 @@ export default function MemberList() {
               </p>
 
               <p className="text-xs text-slate-400">Join</p>
-              <p className="text-slate-200 text-sm">{formatDateID(m.created_at)}</p>
+              <p className="text-slate-200 text-sm">
+                {formatDateID(m.created_at)}
+              </p>
             </div>
           </div>
         ))}
       </div>
-
     </div>
   );
 }
