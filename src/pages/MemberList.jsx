@@ -80,38 +80,38 @@ export default function MemberList() {
     setLoadingUpdate(true);
 
     try {
-      const res = await fetch(`${API_BASE}/update-nickname`, {
+        const res = await fetch(`${API_BASE}/biodata/get-all`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editId,
-          unique_key: uniqueKeyInput,
-          new_nickname: newNickname,
+            id: editId,
+            unique_key: uniqueKeyInput,
+            new_nickname: newNickname,
         }),
-      });
+        });
 
-      const json = await res.json();
-      setLoadingUpdate(false);
+        const json = await res.json();
+        setLoadingUpdate(false);
 
-      if (!json.success) {
+        if (!json.success) {
         toast.error(json.message || "Gagal update.");
         return;
-      }
+        }
 
-      toast.success("Nickname berhasil diperbarui!");
+        toast.success("Nickname berhasil diperbarui!");
 
-      setMembers((prev) =>
+        setMembers((prev) =>
         prev.map((m) =>
-          m.id === editId ? { ...m, nickname: newNickname } : m
+            m.id === editId ? { ...m, nickname: newNickname } : m
         )
-      );
+        );
 
-      setShowPopup(false);
+        setShowPopup(false);
     } catch (err) {
-      setLoadingUpdate(false);
-      toast.error("Server error!");
+        setLoadingUpdate(false);
+        toast.error("Server error!");
     }
-  };
+    };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-100 to-blue-200 px-6 py-12 text-slate-800">
