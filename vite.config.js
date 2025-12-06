@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { viteStaticCopy } from 'vite-plugin-static-copy'
 import javascriptObfuscator from 'vite-plugin-javascript-obfuscator'
+import fs from 'fs'
 
 export default defineConfig(({ command }) => {
   const isBuild = command === 'build'
@@ -11,11 +11,7 @@ export default defineConfig(({ command }) => {
     plugins: [
       react(),
 
-      // Copy _redirects ke dist
-      viteStaticCopy({
-        targets: [{ src: '_redirects', dest: '.' }]
-      }),
-
+      // 🔥 Obfuscation hanya saat build
       isBuild &&
         javascriptObfuscator({
           compact: true,
@@ -41,15 +37,17 @@ export default defineConfig(({ command }) => {
         }),
     ].filter(Boolean),
 
-    // ❗ HAPUS server.https sepenuhnya saat build
-    server: command === "serve" ? {
-      https: {
-        key: fs.readFileSync('./localhost-key.pem'),
-        cert: fs.readFileSync('./localhost.pem'),
-      },
-      host: true,
-      port: 5173,
-    } : undefined,
+    // 🔥 LOCAL DEV HTTPS hanya saat `npm run dev`
+    server: command === 'serve'
+      ? {
+          https: {
+            key: fs.readFileSync('./localhost-key.pem'),
+            cert: fs.readFileSync('./localhost.pem'),
+          },
+          host: true,
+          port: 5173,
+        }
+      : undefined,
 
     build: {
       sourcemap: false,
