@@ -5,25 +5,31 @@ import FormInput from "../components/FormInputReg.jsx";
 import DomisiliSelect from "../components/DomisiliSelect.jsx";
 import Select from "react-select";
 import toast from "react-hot-toast";
+import { resizeBase64, validateImageFile } from "../utils/imageTools";
 import { useNavigate } from "react-router-dom";
 
 const GENDER_KEY = "detected_gender_v1";
 
 export default function RegForm() {
-  const [frameStatus, setFrameStatus] = useState("normal");
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+  const [frameStatus] = useState("normal");
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState(null);
+
   const [photo, setPhoto] = useState(null);
   const [uploadFileBase64, setUploadFileBase64] = useState(null);
-  const navigate = useNavigate();
 
-  // POPUP UNIQUE KEY
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [uploadFilename, setUploadFilename] = useState("");
+
   const [showPopup, setShowPopup] = useState(false);
   const [uniqueKey, setUniqueKey] = useState("");
+  const navigate = useNavigate();
 
-  // FORM INPUT
+  // FORM STATE
   const [nama, setNama] = useState("");
   const [nickname, setNickname] = useState("");
   const [tanggalLahir, setTanggalLahir] = useState("");
@@ -38,7 +44,7 @@ export default function RegForm() {
     }
   });
 
-  // DOMISILI
+  // DOMISILI STATE
   const [provinces, setProvinces] = useState([]);
   const [regencies, setRegencies] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -51,23 +57,44 @@ export default function RegForm() {
 
   const [errors, setErrors] = useState({});
 
+  // =============================
+  // UPLOAD FILE + RESIZE
+  // =============================
   const handleUploadFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const err = validateImageFile(file);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+
+    setUploadLoading(true);
+    setUploadFilename(file.name);
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setUploadFileBase64(reader.result); // base64 file upload
+    reader.onloadend = async () => {
+      try {
+        const resized = await resizeBase64(reader.result, 480, 0.8);
+        setUploadFileBase64(resized);
+      } catch {
+        toast.error("Gagal memproses gambar.");
+      } finally {
+        setUploadLoading(false);
+      }
     };
+
     reader.readAsDataURL(file);
   };
 
-
-  // FETCH DATA DOMISILI
+  // =============================
+  // FETCH DOMISILI
+  // =============================
   useEffect(() => {
     fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
-      .then((res) => res.json())
-      .then((data) => setProvinces(data));
+      .then((r) => r.json())
+      .then(setProvinces);
   }, []);
 
   useEffect(() => {
@@ -75,8 +102,8 @@ export default function RegForm() {
     fetch(
       `https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${selectedProvince}.json`
     )
-      .then((res) => res.json())
-      .then((data) => setRegencies(data));
+      .then((r) => r.json())
+      .then(setRegencies);
   }, [selectedProvince]);
 
   useEffect(() => {
@@ -84,8 +111,8 @@ export default function RegForm() {
     fetch(
       `https://www.emsifa.com/api-wilayah-indonesia/api/districts/${selectedRegency}.json`
     )
-      .then((res) => res.json())
-      .then((data) => setDistricts(data));
+      .then((r) => r.json())
+      .then(setDistricts);
   }, [selectedRegency]);
 
   useEffect(() => {
@@ -93,40 +120,45 @@ export default function RegForm() {
     fetch(
       `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${selectedDistrict}.json`
     )
-      .then((res) => res.json())
-      .then((data) => setVillages(data));
+      .then((r) => r.json())
+      .then(setVillages);
   }, [selectedDistrict]);
 
+  // =============================
   // CAMERA
+  // =============================
   const startCamera = async () => {
     try {
       const cam = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
       });
-
       setStream(cam);
       setCameraActive(true);
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = cam;
-        videoRef.current.onloadedmetadata = () => videoRef.current.play();
-      }
+      videoRef.current.srcObject = cam;
+      videoRef.current.onloadedmetadata = () => videoRef.current.play();
     } catch {
       toast.error("Tidak bisa membuka kamera.");
     }
   };
 
   const stopCamera = () => {
-    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream?.getTracks().forEach((t) => t.stop());
     setCameraActive(false);
   };
 
-  const takePhoto = () => {
+  const takePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    setCameraLoading(true);
+
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
 
-    if (video.readyState < 2) return setTimeout(takePhoto, 250);
+    if (video.readyState < 2) {
+      setTimeout(takePhoto, 200);
+      return;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -134,20 +166,25 @@ export default function RegForm() {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const base64 = canvas.toDataURL("image/png");
-    setPhoto(base64);
+    const base64 = canvas.toDataURL("image/jpeg");
+
+    const resizedFace = await resizeBase64(base64, 720, 0.8);
+
+    setPhoto(resizedFace);
     stopCamera();
+    setCameraLoading(false);
   };
 
   useEffect(() => {
-    return () => {
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-    };
+    return () => stream?.getTracks().forEach((t) => t.stop());
   }, [stream]);
 
-  // VALIDASI
+  // =============================
+  // VALIDASI FORM
+  // =============================
   const validateForm = () => {
     const e = {};
+
     if (!nama.trim()) e.nama = "Nama wajib diisi.";
     if (!nickname.trim()) e.nickname = "Nickname wajib diisi.";
     if (!tanggalLahir.trim()) e.tanggal = "Tanggal lahir wajib diisi.";
@@ -158,17 +195,25 @@ export default function RegForm() {
     if (!selectedRegency) e.regency = "Kabupaten wajib dipilih.";
     if (!selectedDistrict) e.district = "Kecamatan wajib dipilih.";
     if (!selectedVillage) e.village = "Kelurahan wajib dipilih.";
-    if (!photo) e.photo = "Foto wajib diambil.";
-    if (!uploadFileBase64) e.path = "File wajib diupload.";
+
+    if (!uploadFileBase64) e.path = "Foto upload wajib diisi.";
+    if (!photo) e.photo = "Foto kamera wajib diambil.";
 
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  // HANDLE SUBMIT
+  // =============================
+  // SUBMIT
+  // =============================
   const handleSubmit = async () => {
+    if (uploadLoading || cameraLoading) {
+      toast.error("Tunggu gambar selesai diproses...");
+      return;
+    }
+
     if (!validateForm()) {
-      toast.error("Masih ada yang belum diisi!");
+      toast.error("Masih ada data yang belum lengkap!");
       return;
     }
 
@@ -185,19 +230,10 @@ export default function RegForm() {
       kel: villages.find((v) => v.id == selectedVillage)?.name || "",
 
       path: uploadFileBase64,
-
-      // === INI YANG BARU ===
       path_verify: photo,
     };
 
-
     try {
-      // const res = await fetch("http://192.168.100.41:3000/api/biodata", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify(payload),
-      // });
-
       const res = await fetch("https://api-suffergatte.vercel.app/api/biodata/get-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,11 +243,10 @@ export default function RegForm() {
       const data = await res.json();
 
       if (!data.success) {
-        toast.error(data.message);
+        toast.error(data.message || "Gagal submit.");
         return;
       }
 
-      // === SUCCESS ===
       setUniqueKey(data.unique_key);
       setShowPopup(true);
     } catch (err) {
@@ -219,21 +254,20 @@ export default function RegForm() {
     }
   };
 
-  // COPY UNIQUE KEY → tutup popup dulu, baru redirect
+  // =============================
+  // COPY UNIQUE KEY
+  // =============================
   const copyUniqueKey = () => {
     navigator.clipboard.writeText(uniqueKey);
     toast.success("Unique Key disalin!");
 
-    // Tutup popup di halaman ini
     setShowPopup(false);
-
-    // Setelah itu redirect ke /members (reset semua state & popup)
-    setTimeout(() => {
-      window.location.href = "/members";
-    }, 200); // boleh 0-200ms, cuma buat rasa smooth aja
+    setTimeout(() => (window.location.href = "/members"), 200);
   };
 
-  // SELECT STYLE
+  // =============================
+  // STYLING SELECT
+  // =============================
   const selectStyles = {
     control: (base) => ({
       ...base,
@@ -243,15 +277,12 @@ export default function RegForm() {
       padding: "4px",
       color: "#fff",
     }),
-    menu: (base) => ({ ...base, backgroundColor: "#0f172a", color: "#fff" }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isFocused
-        ? "rgba(99,102,241,0.4)"
-        : "transparent",
-      color: "#fff",
+    menu: (b) => ({ ...b, backgroundColor: "#0f172a" }),
+    option: (b, s) => ({
+      ...b,
+      backgroundColor: s.isFocused ? "rgba(99,102,241,0.4)" : "transparent",
     }),
-    singleValue: (base) => ({ ...base, color: "#fff" }),
+    singleValue: (b) => ({ ...b, color: "#fff" }),
   };
 
   const genderOptions = [
@@ -259,27 +290,28 @@ export default function RegForm() {
     { value: "Perempuan", label: "Perempuan" },
   ];
 
+  // =============================
+  // RENDER
+  // =============================
   return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4 py-10">
-      {/* === POPUP UNIQUE KEY === */}
+      
+      {/* POPUP */}
       {showPopup && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-slate-800 p-6 rounded-2xl shadow-xl w-80 text-center">
-            <h2 className="text-xl font-bold text-white mb-3">
-              Registrasi Berhasil!
-            </h2>
-
+          <div className="bg-slate-800 p-6 rounded-2xl w-80 text-center shadow-xl">
+            <h2 className="text-xl font-bold mb-3">Registrasi Berhasil!</h2>
             <p className="text-slate-300 text-sm mb-2">
-              Ini adalah <span className="font-semibold">Unique Key</span> kamu:
+              Ini adalah <b>Unique Key</b> kamu:
             </p>
 
-            <div className="bg-slate-900 text-indigo-300 font-mono p-3 rounded-xl border border-indigo-500 mb-4">
+            <div className="bg-slate-900 border border-indigo-500 text-indigo-300 font-mono p-3 rounded-xl mb-4">
               {uniqueKey}
             </div>
 
             <button
               onClick={copyUniqueKey}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl transition"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded-xl text-white"
             >
               Salin & Lanjutkan
             </button>
@@ -287,68 +319,34 @@ export default function RegForm() {
         </div>
       )}
 
+      {/* FORM */}
       <div className="w-full max-w-5xl">
-        {/* HEADER */}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-            Form Registrasi Pengguna
-          </h1>
-          <p className="text-sm md:text-base text-slate-400 mt-1">
-            Lengkapi data dan ambil foto wajah untuk menyelesaikan proses.
-          </p>
-        </div>
+        <h1 className="text-3xl md:text-4xl font-semibold">Form Registrasi Pengguna</h1>
+        <p className="text-slate-400 text-sm mt-1">
+          Lengkapi data dan ambil foto wajah untuk menyelesaikan proses.
+        </p>
 
-        {/* FORM GRID */}
-        <div className="grid gap-10 md:grid-cols-[1.3fr_1fr]">
-          {/* FORM */}
+        <div className="grid gap-10 md:grid-cols-[1.3fr_1fr] mt-8">
+
+          {/* INPUT FORM */}
           <div className="space-y-6">
-            <FormInput
-              label="Nama Lengkap"
-              value={nama}
-              setValue={setNama}
-              error={errors.nama}
-            />
-            <FormInput
-              label="Nickname"
-              value={nickname}
-              setValue={setNickname}
-              error={errors.nickname}
-            />
-            <FormInput
-              label="Tanggal Lahir"
-              type="date"
-              value={tanggalLahir}
-              setValue={setTanggalLahir}
-              error={errors.tanggal}
-            />
-            <FormInput
-              label="Tempat Lahir"
-              value={tempatLahir}
-              setValue={setTempatLahir}
-              error={errors.tempat}
-            />
-            <FormInput
-              label="Jabatan"
-              value={jabatan}
-              setValue={setJabatan}
-              error={errors.jabatan}
-            />
+            <FormInput label="Nama Lengkap" value={nama} setValue={setNama} error={errors.nama} />
+            <FormInput label="Nickname" value={nickname} setValue={setNickname} error={errors.nickname} />
+            <FormInput label="Tanggal Lahir" type="date" value={tanggalLahir} setValue={setTanggalLahir} error={errors.tanggal} />
+            <FormInput label="Tempat Lahir" value={tempatLahir} setValue={setTempatLahir} error={errors.tempat} />
+            <FormInput label="Jabatan" value={jabatan} setValue={setJabatan} error={errors.jabatan} />
 
-            {/* SELECT GENDER */}
+            {/* GENDER */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Jenis Kelamin
-              </label>
+              <label className="block text-sm font-medium mb-1">Jenis Kelamin</label>
               <Select
-                value={genderOptions.find((opt) => opt.value === gender) || null}
-                onChange={(opt) => setGender(opt ? opt.value : "")}
+                value={genderOptions.find((o) => o.value === gender) || null}
+                onChange={(o) => setGender(o?.value || "")}
                 options={genderOptions}
                 styles={selectStyles}
                 placeholder="Pilih jenis kelamin"
               />
-              {errors.gender && (
-                <p className="text-red-400 text-xs mt-1">{errors.gender}</p>
-              )}
+              {errors.gender && <p className="text-red-400 text-xs mt-1">{errors.gender}</p>}
             </div>
 
             {/* DOMISILI */}
@@ -369,37 +367,33 @@ export default function RegForm() {
               errors={errors}
             />
 
-            {/* Upload Foto */}
+            {/* UPLOAD FILE */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Upload Foto (jpg/png)
-              </label>
-
+              <label className="block text-sm font-medium mb-1">Upload Foto (jpg/png)</label>
               <input
                 type="file"
-                accept="image/png, image/jpeg"
+                accept="image/png, image/jpeg, image/webp"
                 onChange={handleUploadFile}
                 className="block w-full bg-slate-800 rounded-xl px-3 py-2 text-sm"
               />
 
-              {uploadFileBase64 && (
-                <img
-                  src={uploadFileBase64}
-                  alt="Preview Upload"
-                  className="mt-3 w-40 rounded-xl border border-slate-600"
-                />
+              {uploadLoading && <p className="text-indigo-400 text-xs mt-1">Mengompres gambar...</p>}
+
+              {uploadFilename && (
+                <p className="text-slate-400 text-xs mt-1">File: {uploadFilename}</p>
               )}
 
-              {errors.path && (
-                <p className="text-red-400 text-xs mt-1">{errors.path}</p>
+              {uploadFileBase64 && (
+                <img src={uploadFileBase64} alt="Preview Upload" className="mt-3 w-40 rounded-xl border border-slate-600" />
               )}
+
+              {errors.path && <p className="text-red-400 text-xs mt-1">{errors.path}</p>}
             </div>
 
-            {/* SUBMIT BUTTON */}
             <button
               type="button"
               onClick={handleSubmit}
-              className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-4 py-3 text-sm font-semibold text-white"
+              className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-2xl text-sm font-semibold"
             >
               Submit Form
             </button>
@@ -407,24 +401,11 @@ export default function RegForm() {
 
           {/* CAMERA */}
           <div className="space-y-4">
-            <CameraFrame
-              status={frameStatus}
-              cameraActive={cameraActive}
-              photo={photo}
-            >
+            <CameraFrame status={frameStatus} cameraActive={cameraActive} photo={photo}>
               {!photo ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="h-full w-full object-cover"
-                />
+                <video ref={videoRef} autoPlay playsInline className="h-full w-full object-cover" />
               ) : (
-                <img
-                  src={photo}
-                  alt="Foto hasil"
-                  className="h-full w-full object-cover"
-                />
+                <img src={photo} alt="Foto hasil" className="h-full w-full object-cover" />
               )}
             </CameraFrame>
 
@@ -432,17 +413,11 @@ export default function RegForm() {
 
             <div className="grid grid-cols-2 gap-3 mt-2">
               {!cameraActive ? (
-                <button
-                  onClick={startCamera}
-                  className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
-                >
+                <button onClick={startCamera} className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm">
                   Aktifkan Kamera
                 </button>
               ) : (
-                <button
-                  onClick={stopCamera}
-                  className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm"
-                >
+                <button onClick={stopCamera} className="bg-slate-800 px-3 py-2.5 rounded-2xl text-sm">
                   Matikan Kamera
                 </button>
               )}
@@ -461,6 +436,8 @@ export default function RegForm() {
               </button>
             </div>
 
+            {cameraLoading && <p className="text-indigo-400 text-xs">Memproses foto...</p>}
+
             {photo && (
               <button
                 onClick={() => setPhoto(null)}
@@ -470,9 +447,7 @@ export default function RegForm() {
               </button>
             )}
 
-            {errors.photo && (
-              <p className="text-red-400 text-xs">{errors.photo}</p>
-            )}
+            {errors.photo && <p className="text-red-400 text-xs">{errors.photo}</p>}
           </div>
         </div>
       </div>
