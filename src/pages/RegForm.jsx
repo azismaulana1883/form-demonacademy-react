@@ -16,6 +16,7 @@ export default function RegForm() {
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState(null);
   const [photo, setPhoto] = useState(null);
+  const [uploadFileBase64, setUploadFileBase64] = useState(null);
   const navigate = useNavigate();
 
   // POPUP UNIQUE KEY
@@ -49,6 +50,18 @@ export default function RegForm() {
   const [selectedVillage, setSelectedVillage] = useState("");
 
   const [errors, setErrors] = useState({});
+
+  const handleUploadFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUploadFileBase64(reader.result); // base64 file upload
+    };
+    reader.readAsDataURL(file);
+  };
+
 
   // FETCH DATA DOMISILI
   useEffect(() => {
@@ -146,6 +159,7 @@ export default function RegForm() {
     if (!selectedDistrict) e.district = "Kecamatan wajib dipilih.";
     if (!selectedVillage) e.village = "Kelurahan wajib dipilih.";
     if (!photo) e.photo = "Foto wajib diambil.";
+    if (!uploadFileBase64) e.path = "File wajib diupload.";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -169,8 +183,13 @@ export default function RegForm() {
       kab: regencies.find((r) => r.id == selectedRegency)?.name || "",
       kec: districts.find((d) => d.id == selectedDistrict)?.name || "",
       kel: villages.find((v) => v.id == selectedVillage)?.name || "",
-      foto_base64: photo,
+
+      path: uploadFileBase64,
+
+      // === INI YANG BARU ===
+      path_verify: photo,
     };
+
 
     try {
       // const res = await fetch("http://192.168.100.41:3000/api/biodata", {
@@ -349,6 +368,32 @@ export default function RegForm() {
               selectStyles={selectStyles}
               errors={errors}
             />
+
+            {/* Upload Foto */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Upload Foto (jpg/png)
+              </label>
+
+              <input
+                type="file"
+                accept="image/png, image/jpeg"
+                onChange={handleUploadFile}
+                className="block w-full bg-slate-800 rounded-xl px-3 py-2 text-sm"
+              />
+
+              {uploadFileBase64 && (
+                <img
+                  src={uploadFileBase64}
+                  alt="Preview Upload"
+                  className="mt-3 w-40 rounded-xl border border-slate-600"
+                />
+              )}
+
+              {errors.path && (
+                <p className="text-red-400 text-xs mt-1">{errors.path}</p>
+              )}
+            </div>
 
             {/* SUBMIT BUTTON */}
             <button
