@@ -2,10 +2,12 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-route
 import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 
+import Home from "./pages/Home";
 import RegForm from "./pages/RegForm";
 import MemberList from "./pages/MemberList";
 import FaceVerification from "./components/FaceVerificationMPNew";
 
+// WRAPPER - agar bisa navigate setelah verified
 function FaceVerificationWrapper() {
   const navigate = useNavigate();
 
@@ -17,6 +19,7 @@ function FaceVerificationWrapper() {
   return <FaceVerification onVerified={handleVerified} />;
 }
 
+// PROTECT /register - harus sudah verified
 function ProtectedRegister() {
   const navigate = useNavigate();
 
@@ -24,7 +27,7 @@ function ProtectedRegister() {
     const ok = localStorage.getItem("verified");
 
     if (ok !== "true") {
-      navigate("/");
+      navigate("/verify"); // redirect ke face verification
     }
   }, []);
 
@@ -34,7 +37,8 @@ function ProtectedRegister() {
 export default function App() {
   useEffect(() => {
     const path = window.location.pathname;
-    // Hapus verified jika BUKAN di /register
+
+    // Hapus verified jika user tidak sedang berada di /register
     if (path !== "/register") {
       localStorage.removeItem("verified");
     }
@@ -42,7 +46,7 @@ export default function App() {
 
   return (
     <Router>
-      {/* TOASTER WAJIB DI DALAM RETURN */}
+      {/* GLOBAL TOASTER */}
       <Toaster
         position="top-center"
         toastOptions={{
@@ -55,8 +59,16 @@ export default function App() {
       />
 
       <Routes>
-        <Route path="/" element={<FaceVerificationWrapper />} />
+        {/* HOME PAGE */}
+        <Route path="/" element={<Home />} />
+
+        {/* FACE VERIFICATION */}
+        <Route path="/verify" element={<FaceVerificationWrapper />} />
+
+        {/* REGISTER USER - protected */}
         <Route path="/register" element={<ProtectedRegister />} />
+
+        {/* MEMBERS */}
         <Route path="/members" element={<MemberList />} />
       </Routes>
     </Router>
