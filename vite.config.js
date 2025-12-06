@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import javascriptObfuscator from 'vite-plugin-javascript-obfuscator'
-import copy from 'rollup-plugin-copy'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig(({ command }) => {
   const isBuild = command === 'build'
@@ -12,15 +12,17 @@ export default defineConfig(({ command }) => {
     plugins: [
       react(),
 
-      // ⬇⬇⬇ Tambahkan plugin copy KESINI
-      copy({
+      // 🔥 FIX COPY REDIRECTS
+      viteStaticCopy({
         targets: [
-          { src: 'public/_redirects', dest: 'dist' }  // WAJIB ADA
-        ],
-        hook: 'writeBundle'
+          {
+            src: 'public/_redirects',
+            dest: '.'   // akan menjadi dist/_redirects
+          }
+        ]
       }),
 
-      // 🔥 Obfuscate HANYA saat build
+      // 🔥 Obfuscator saat build saja
       isBuild &&
         javascriptObfuscator({
           compact: true,
