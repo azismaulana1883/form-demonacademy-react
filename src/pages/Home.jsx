@@ -14,9 +14,16 @@ export default function Home() {
         <div className="relative text-center space-y-8 bg-white/10 backdrop-blur-xl p-10 rounded-3xl border border-white/20 shadow-2xl">
           
           {/* LOGO / TITLE */}
-          <h1 className="text-5xl font-extrabold tracking-wide bg-gradient-to-r from-indigo-400 to-cyan-300 text-transparent bg-clip-text drop-shadow-lg">
+          <h1
+            className="
+                text-4xl md:text-5xl font-extrabold tracking-wide 
+                bg-gradient-to-r from-indigo-400 to-cyan-300 
+                text-transparent bg-clip-text drop-shadow-lg
+                leading-tight break-keep
+            "
+            >
             SUFFERGATTE
-          </h1>
+            </h1>
 
           <p className="text-slate-300 text-sm tracking-wide">
             Pilih menu untuk melanjutkan proses registrasi atau melihat anggota.
